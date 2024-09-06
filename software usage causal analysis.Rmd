@@ -1,0 +1,264 @@
+---
+title: "Software Usage Promotion Campaign Uplift Modeling"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#import libraries
+```{r, message=FALSE}
+library(cobalt)
+library(WeightIt)
+library(lmtest)
+library(sandwich)
+library(knitr)
+library(ggplot2)
+library(rmarkdown)
+library(dplyr)
+library(tidyverse)
+```
+
+```{r, message = FALSE}
+# Load file as dataframe
+df <- read.csv("multi_attribution_update.csv")
+```
+
+```{r, message=FALSE}
+# inspect dataframe
+print(head(df))
+```
+
+```{r, message=FALSE}
+# Inspect the data
+str(df)
+summary(df)
+```
+
+
+```{r, message=FALSE}
+# Define treatment and outcome
+treatment1 <- df$tech_support
+treatment2 <- df$discount
+treatment3 <- df$tech_discount
+outcome <- df$revenue
+```
+
+```{r, message=FALSE}
+# Balance table to show SMD and variance ratio between groups
+
+print("Balance Table for Tech Support")
+bal.tab(
+    x = treatment1 ~ global + major + smc + commercial + it_spend + employee_count,
+    data = df,
+    binary = "std",
+    disp.v.ratio = TRUE   
+)
+
+print("Balance Table for Discount")
+bal.tab(
+    x = treatment2 ~ global + major + smc + commercial + it_spend + employee_count,
+    data = df,
+    binary = "std",
+    disp.v.ratio = TRUE,
+)
+
+print("Balance Table for Tech Support and Discount")
+bal.tab(
+    x = treatment3 ~ global + major + smc + commercial + it_spend + employee_count,
+    data = df,
+    binary = "std",
+    disp.v.ratio = TRUE,
+)
+```
+
+```{r, message=FALSE}
+# create propensity scores with WeightIt
+weight1 <- weightit(treatment1 ~ global + major + smc + commercial + it_spend + employee_count, data = df, method = "ps", estimand = "ate")
+
+weight2 <- weightit(treatment2 ~ global + major + smc + commercial + it_spend + employee_count, data = df, method = "ps", estimand = "ate")
+
+weight3 <- weightit(treatment3 ~ global + major + smc + commercial + it_spend + employee_count, data = df, method = "ps", estimand = "ate")
+```
+
+```{r, message=FALSE}
+# check the summary
+summary(weight1)
+summary(weight2)
+summary(weight3)
+```
+
+```{r, message=FALSE}
+# check balance using cobalt
+print("Balance Table for Tech Support")
+bal.tab(
+    weight1,
+    data = df,
+    binary = "std",
+    disp.v.ratio = TRUE)
+
+print("Balance Table for Discount")
+bal.tab(
+    weight2,
+    data = df,
+    binary = "std",
+    disp.v.ratio = TRUE)
+
+print("Balance Table for Tech Support and Discount")
+bal.tab(
+    weight3,
+    data = df,
+    binary = "std",
+    disp.v.ratio = TRUE)
+```
+
+```{r, message=FALSE, fig.width=8, fig.height=8}
+# visualize the balance
+love.plot(
+    weight1,
+    binary = "std",
+    thresholds = c(m = 0.1),
+    title = "Love Plot for Tech Support")
+
+love.plot(
+    weight2,
+    binary = "std",
+    thresholds = c(m = 0.1),
+    title = "Love Plot for Discount")
+
+love.plot(
+    weight3,
+    binary = "std",
+    thresholds = c(m = 0.1),
+    title = "Love Plot for Tech Support and Discount")
+```
+
+```{r, message=FALSE}
+# recreate propensity scores with updated covariates (remove employee_count and it_spend -- adding size and pc_count)
+weight1a <- weightit(treatment1 ~ global + major + smc + commercial + pc_count + size, data = df, method = "ps", estimand = "ate")
+
+weight2a <- weightit(treatment2 ~ global + major + smc + commercial + pc_count + size, data = df, method = "ps", estimand = "ate")
+
+weight3a <- weightit(treatment3 ~ global + major + smc + commercial + pc_count + size, data = df, method = "ps", estimand = "ate")
+```
+
+```{r, message=FALSE}
+# check balance using cobalt
+print("New Balance Table for Tech Support")
+bal.tab(
+    weight1a,
+    data = df,
+    binary = "std",
+    disp.v.ratio = TRUE)
+
+print("New Balance Table for Discount")
+bal.tab(
+    weight2a,
+    data = df,
+    binary = "std",
+    disp.v.ratio = TRUE)
+
+print("New Balance Table for Tech Support and Discount")
+bal.tab(
+    weight3a,
+    data = df,
+    binary = "std",
+    disp.v.ratio = TRUE)
+```
+
+```{r, message=FALSE}
+# visualize the balance
+love.plot(
+    weight1a,
+    binary = "std",
+    thresholds = c(m = 0.1),
+    title = "New Love Plot for Tech Support")
+
+love.plot(
+    weight2a,
+    binary = "std",
+    thresholds = c(m = 0.1),
+    title = "New Love Plot for Discount")
+
+love.plot(
+    weight3a,
+    binary = "std",
+    thresholds = c(m = 0.1),
+    title = "New Love Plot for Tech Support and Discount")
+```
+
+```{r, message=FALSE}
+# Balance plot of propensity scores before and after weighting
+bal.plot(
+    weight1,
+    var.name = "prop.score",
+    which = "both"
+)
+
+bal.plot(
+    weight2,
+    var.name = "prop.score",
+    which = "both"
+)
+
+bal.plot(
+    weight3,
+    var.name = "prop.score",
+    which = "both"
+)
+
+```
+
+```{r, message=FALSE}
+# Balance plot of propensity scores before and after weighting of updated weights
+bal.plot(
+    weight1a,
+    var.name = "prop.score",
+    which = "both"
+)
+
+bal.plot(
+    weight2a,
+    var.name = "prop.score",
+    which = "both"
+)
+
+bal.plot(
+    weight3a,
+    var.name = "prop.score",
+    which = "both"
+)
+```
+
+```{r, message=FALSE}
+# weighted regression for treatment 1
+model1a <- glm(outcome ~ treatment1 + global + major + smc + commercial + pc_count + size, data = df, weights = weight1a$weights)
+summary(model1a)
+
+# robust standard errors
+coeftest(model1a, vcov = vcovHC(model1a, type = "HC3"))
+```
+
+```{r, message=FALSE}
+# weighted regression for treatment 2
+model2a <- glm(outcome ~ treatment2 + global + major + smc + commercial + pc_count + size, data = df, weights = weight2a$weights)
+summary(model2a)
+
+# robust standard errors
+coeftest(model2a, vcov = vcovHC(model2a, type = "HC3"))
+```
+
+```{r, message=FALSE}
+# weighted regression for treatment 3
+model3a <- glm(outcome ~ treatment3 + global + major + smc + commercial + pc_count + size, data = df, weights = weight3a$weights)
+summary(model3a)
+
+# robust standard errors
+coeftest(model3a, vcov = vcovHC(model3a, type = "HC3"))
+```
+
+## Interpretation
+
+
+
