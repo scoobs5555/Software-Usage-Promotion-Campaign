@@ -1,7 +1,11 @@
 ---
 title: "Software Usage Promotion Campaign Uplift Modeling"
-output: html_document
+author: "Martin MacFarlane"
+date: "Sept 10, 2024"
+output: github_document
 ---
+
+Initial data exploration was done in "Software Usage Promotion Campaign.ipynb" and exported to "multi_attribution_update.csv".
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -36,6 +40,7 @@ str(df)
 summary(df)
 ```
 
+Defining 3 separate treatment variables: "tech_support", "discount" "tech_discount".  The latter which will combine the effect of both tech_support and discount on the outcome variable "revenue".
 
 ```{r, message=FALSE}
 # Define treatment and outcome
@@ -44,6 +49,8 @@ treatment2 <- df$discount
 treatment3 <- df$tech_discount
 outcome <- df$revenue
 ```
+
+Creating balance tables for the 3 treatment variables to obtain the standardized mean difference and variance ratio for each treatment.  SMD values should be +/- 0.1 and Variance Ratio values should be between 0.5 - 2.  The treatment and control groups are not well balanced and weighting will be needed.
 
 ```{r, message=FALSE}
 # Balance table to show SMD and variance ratio between groups
@@ -73,6 +80,8 @@ bal.tab(
 )
 ```
 
+Perform the inverse probability of treatment weighting (IPTW) procedure for each treatment to see if we can minimize imbalance between the treatment groups before estimating the causal treatment effect.
+
 ```{r, message=FALSE}
 # create propensity scores with WeightIt
 weight1 <- weightit(treatment1 ~ global + major + smc + commercial + it_spend + employee_count, data = df, method = "ps", estimand = "ate")
@@ -88,6 +97,8 @@ summary(weight1)
 summary(weight2)
 summary(weight3)
 ```
+
+The weighted summary statisics seem reasonable as does the adjusted size of the control and treated groups.  We'll now re-check the SMC and variance ratio of the weighted groups.
 
 ```{r, message=FALSE}
 # check balance using cobalt
@@ -113,6 +124,8 @@ bal.tab(
     disp.v.ratio = TRUE)
 ```
 
+Visualize the balance of the adjusted vs unadjusted groups
+
 ```{r, message=FALSE, fig.width=8, fig.height=8}
 # visualize the balance
 love.plot(
@@ -134,6 +147,10 @@ love.plot(
     title = "Love Plot for Tech Support and Discount")
 ```
 
+The groups appear to be well balanced.
+
+Let's create an alternate set of weighted groups to see if we can improve the balance.  We'll remove employee_count and it_spend from the covariates and add size and pc_count.
+
 ```{r, message=FALSE}
 # recreate propensity scores with updated covariates (remove employee_count and it_spend -- adding size and pc_count)
 weight1a <- weightit(treatment1 ~ global + major + smc + commercial + pc_count + size, data = df, method = "ps", estimand = "ate")
@@ -142,6 +159,8 @@ weight2a <- weightit(treatment2 ~ global + major + smc + commercial + pc_count +
 
 weight3a <- weightit(treatment3 ~ global + major + smc + commercial + pc_count + size, data = df, method = "ps", estimand = "ate")
 ```
+
+Creating balance tables for our new weighted groups.  The values all seem to fall within acceptable ranges.
 
 ```{r, message=FALSE}
 # check balance using cobalt
@@ -167,6 +186,8 @@ bal.tab(
     disp.v.ratio = TRUE)
 ```
 
+Visualize the balance of the adjusted vs unadjusted groups for the alternative weights.
+
 ```{r, message=FALSE}
 # visualize the balance
 love.plot(
@@ -187,6 +208,8 @@ love.plot(
     thresholds = c(m = 0.1),
     title = "New Love Plot for Tech Support and Discount")
 ```
+
+Creating balance plots for our original weights.
 
 ```{r, message=FALSE}
 # Balance plot of propensity scores before and after weighting
@@ -210,6 +233,8 @@ bal.plot(
 
 ```
 
+Creating balance plots for our new weights.
+
 ```{r, message=FALSE}
 # Balance plot of propensity scores before and after weighting of updated weights
 bal.plot(
@@ -230,6 +255,8 @@ bal.plot(
     which = "both"
 )
 ```
+
+Both groups appear to be well balanced.  We will continue with a weighted generalized regression model using our new weights which allows for non-normal distributions.
 
 ```{r, message=FALSE}
 # weighted regression for treatment 1
@@ -260,5 +287,31 @@ coeftest(model3a, vcov = vcovHC(model3a, type = "HC3"))
 
 ## Interpretation
 
+### Treatment 1 - Tech Support
+Our model predicts that when tech support is provided, an increase in revenue of approximately $7,143 is expected with a standard error of about $208.
 
+While holding all other variables constant, companies that have global offices create addition revenue of approximately $3,801.  Similarly, companies that are large consumers in their industry (major) and companies that are classified as "commercial" create additional revenue of approximately $1,485 and $1,252 respectively.
 
+The number of computers a company has can also be used to predict additional revenue.  Every computer a company has can potentially generate an additional $47 in revenue. 
+
+### Treatment 2 - Discount
+Our model predicts that when a discount is provided, an increase in revenue of approximately $5,692 is expected with a standard error of about $250.
+
+While holding all other variables constant, companies that have global offices create addition revenue of approximately $4,328.  Similarly, companies that are large consumers in their industry (major) and companies that are classified as "commercial" create additional revenue of approximately $2,547 and $585 respectively.
+
+The number of computers a company has can also be used to predict additional revenue.  Every computer a company has can potentially generate an additional $49 in revenue. 
+
+### Treatment 3 - Tech Support and Discount
+Our model predicts that when tech support AND a discount is provided, an increase in revenue of approximately $8,485 is expected with a standard error of about $230.
+
+While holding all other variables constant, companies that have global offices create addition revenue of approximately $4,108.  Similarly, companies that are large consumers in their industry (major) and companies that are classified as "commercial" create additional revenue of approximately $2,135 and $851 respectively.
+
+The number of computers a company has can also be used to predict additional revenue.  Every computer a company has can potentially generate an additional $47 in revenue. 
+
+While all 3 treatments are likely to created additional revenue, combining both tech support and a discount will likely create more.  However, the benefit of providing a discount on top of tech support is only around $1,342 and so the costs of providing tech support and a discount should be taken into account to ensure that revenue is being maximized.
+
+The company's profile should also be taken into account as companies with global offices, who are large consumers in their industry, who are classified as "commercial" and have a large number of computers will also affect their revenue in a positive way.
+
+## Further Considerations
+
+The costs of providing tech support and the amount of discount provided are not known.  These costs should be further investigated to ensure that revenue is being maximized.  
