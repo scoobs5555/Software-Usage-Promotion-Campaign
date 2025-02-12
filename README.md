@@ -93,7 +93,7 @@ An updated csv file ("multi_attribution_update") was exported and analyzed with 
 ### Treatment 1 - Tech Support
 Our model predicts that when tech support is provided, an increase in revenue of approximately $7,143 is expected with a standard error of about $208.
 
-While holding all other variables constant, companies that have global offices create addition revenue of approximately $3,801.  Similarly, companies that are large consumers in their industry (major) and companies that are classified as "commercial" create additional revenue of approximately $1,485 and $1,252 respectively.
+While holding all other variables constant, companies that have global offices create additional revenue of approximately $3,801.  Similarly, companies that are large consumers in their industry (major) and companies that are classified as "commercial" create additional revenue of approximately $1,485 and $1,252 respectively.
 
 The number of computers a company has can also be used to predict additional revenue.  Every computer a company has can potentially generate an additional $47 in revenue. 
 
